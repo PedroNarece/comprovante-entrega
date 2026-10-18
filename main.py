@@ -3,8 +3,8 @@ ProofSnap - Delivery Receipt Capture & Validation
 Autor: Pedro Narece Silva Guimarães
 
 Nota de Desenvolvimento:
-Projeto prático desenvolvido para otimização logística (Aliança Atacadista), 
-evoluindo em paralelo com a minha graduação em Engenharia da Computação. 
+Projeto prático desenvolvido para otimização logística de entregas,
+evoluindo em paralelo com a minha graduação em Engenharia da Computação.
 A visão do produto, arquitetura de dados e validação do fluxo foram estruturadas 
 por mim. O código-fonte foi escrito, refatorado e auditado em colaboração com 
 Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto técnico.
