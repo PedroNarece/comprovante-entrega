@@ -24,10 +24,14 @@ security = HTTPBasic()
 os.makedirs("uploads", exist_ok=True)
 
 def verificar_credenciais(credentials: HTTPBasicCredentials = Depends(security)):
-    # Lê as variáveis de ambiente ou usa os valores padrão para desenvolvimento
-    user = os.environ.get("PROOFSNAP_USER", "admin")
-    pwd = os.environ.get("PROOFSNAP_PASS", "alianca123")
+    # Lê as variáveis de ambiente SEM valores padrão fixos
+    user = os.environ.get("PROOFSNAP_USER")
+    pwd = os.environ.get("PROOFSNAP_PASS")
     
+    # Trava de segurança: se as variáveis não estiverem configuradas no terminal, o sistema recusa-se a funcionar
+    if not user or not pwd:
+        raise HTTPException(status_code=500, detail="Credenciais não configuradas no servidor.")
+        
     usuario_correto = secrets.compare_digest(credentials.username, user)
     senha_correta = secrets.compare_digest(credentials.password, pwd)
     if not (usuario_correto and senha_correta):
@@ -37,6 +41,7 @@ def verificar_credenciais(credentials: HTTPBasicCredentials = Depends(security))
             headers={"WWW-Authenticate": "Basic"},
         )
     return credentials.username
+
 
 @app.get("/")
 def interface_motorista():
