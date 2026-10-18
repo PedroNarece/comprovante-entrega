@@ -1,0 +1,9 @@
+# Ignora a pasta com os canhotos locais
+uploads/
+
+# Ignora o ambiente virtual do Python
+.venv/
+__pycache__/
+
+# Ignora ficheiros de sistema do macOS
+.DS_Store
