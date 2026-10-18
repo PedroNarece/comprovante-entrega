@@ -1,0 +1,158 @@
+<!--
+ProofSnap - Delivery Receipt Capture & Validation
+Autor: Pedro Narece Silva Guimarães
+
+Nota de Desenvolvimento:
+A arquitetura, a lógica de negócio e as decisões estruturais deste sistema foram 
+desenhadas e revisadas por mim. Ferramentas de Inteligência Artificial foram 
+utilizadas estritamente como assistentes de digitação para aceleração de sintaxe.
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProofSnap - Motorista</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #f4f4f9; }
+        /* Adicionamos estilo para os novos campos de texto */
+        input[type="text"] { padding: 10px; font-size: 16px; margin-top: 10px; width: 80%; max-width: 300px; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 15px 30px; font-size: 18px; margin-top: 20px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 8px; }
+        input[type="file"] { margin-top: 20px; font-size: 16px; }
+        #mensagem { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>ProofSnap</h1>
+    <p>Preencha os dados e tire a foto do canhoto:</p>
+    
+    <form id="formulario-foto">
+        <!-- Novos campos para Carga e Motorista -->
+        <input type="text" id="numero-carga" placeholder="Número da carga (Ex: 45653)" required>
+        <br>
+        <input type="text" id="nome-motorista" placeholder="Nome do Motorista" required>
+        <br>
+        
+        <input type="file" id="foto-canhoto" accept="image/*" capture="environment" required>
+        <br>
+        <button type="submit">Enviar Canhoto</button>
+    </form>
+
+    <p id="mensagem"></p>
+
+    <script>
+        document.getElementById('formulario-foto').addEventListener('submit', async function(evento) {
+    evento.preventDefault(); 
+    
+    const mensagemTag = document.getElementById('mensagem');
+    const carga = document.getElementById('numero-carga').value;
+    const motorista = document.getElementById('nome-motorista').value;
+    const arquivo = document.getElementById('foto-canhoto').files[0];
+
+    if (!arquivo) return; // Se não houver foto, não faz nada
+
+    // 1. Verifica se há internet no momento do clique
+    if (navigator.onLine) {
+        await enviarParaServidor(carga, motorista, arquivo, mensagemTag);
+    } else {
+        guardarOffline(carga, motorista, arquivo, mensagemTag);
+    }
+});
+
+// Função que faz o envio normal (o que já tínhamos antes)
+async function enviarParaServidor(carga, motorista, arquivo, mensagemTag) {
+    mensagemTag.innerText = "A enviar...";
+    mensagemTag.style.color = "black";
+
+    const pacote = new FormData();
+    pacote.append('foto', arquivo);
+    pacote.append('carga', carga);
+    pacote.append('motorista', motorista);
+
+    try {
+        const resposta = await fetch('/upload/', { method: 'POST', body: pacote });
+
+        if (resposta.ok) {
+            mensagemTag.innerText = "Canhoto enviado com sucesso!";
+            mensagemTag.style.color = "green";
+            document.getElementById('formulario-foto').reset(); 
+        } else {
+            mensagemTag.innerText = "Erro ao enviar canhoto.";
+            mensagemTag.style.color = "red";
+        }
+    } catch (erro) {
+        mensagemTag.innerText = "Erro no servidor. Tentaremos novamente depois.";
+        mensagemTag.style.color = "red";
+        guardarOffline(carga, motorista, arquivo, mensagemTag); // Se a net cair a meio, guarda
+    }
+}
+
+// Função que traduz a foto e a guarda no telemóvel
+function guardarOffline(carga, motorista, arquivo, mensagemTag) {
+    const leitor = new FileReader();
+    
+    leitor.onload = function(eventoLeitura) {
+        const fotoBase64 = eventoLeitura.target.result; // A foto transformada em texto
+        const entrega = { carga: carga, motorista: motorista, foto: fotoBase64 };
+
+        // Vai à memória buscar a fila de entregas ou cria uma fila vazia
+        let entregasPendentes = JSON.parse(localStorage.getItem('filaProofSnap')) || [];
+        entregasPendentes.push(entrega);
+
+        // Grava a fila atualizada de volta na memória do telemóvel
+        localStorage.setItem('filaProofSnap', JSON.stringify(entregasPendentes));
+        
+        mensagemTag.innerText = "Sem sinal! Guardado no telemóvel para envio automático.";
+        mensagemTag.style.color = "orange";
+        document.getElementById('formulario-foto').reset();
+    };
+    
+    leitor.readAsDataURL(arquivo); // Inicia a tradução da foto
+}
+
+// O "espião" que deteta quando a internet (Wi-Fi ou 4G) volta a ligar
+window.addEventListener('online', async function() {
+    let entregasPendentes = JSON.parse(localStorage.getItem('filaProofSnap')) || [];
+
+    if (entregasPendentes.length > 0) {
+        const mensagemTag = document.getElementById('mensagem');
+        mensagemTag.innerText = "Sinal recuperado! A enviar canhotos pendentes...";
+        mensagemTag.style.color = "blue";
+
+        let falhas = []; // Lista para guardar os que voltarem a falhar
+
+        for (let entrega of entregasPendentes) {
+            // Transforma o texto (Base64) de volta num ficheiro de imagem real
+            const respostaBase64 = await fetch(entrega.foto);
+            const blob = await respostaBase64.blob();
+            const arquivoRecuperado = new File([blob], "foto_recuperada.jpg", { type: "image/jpeg" });
+
+            // Empacota e tenta enviar
+            const pacote = new FormData();
+            pacote.append('foto', arquivoRecuperado);
+            pacote.append('carga', entrega.carga);
+            pacote.append('motorista', entrega.motorista);
+
+            try {
+                const resposta = await fetch('/upload/', { method: 'POST', body: pacote });
+                if (!resposta.ok) throw new Error("Servidor rejeitou");
+            } catch (erro) {
+                falhas.push(entrega); // Se falhou, volta para a fila de espera
+            }
+        }
+
+        // Atualiza a memória apenas com os que sobraram (os que falharam)
+        localStorage.setItem('filaProofSnap', JSON.stringify(falhas));
+
+        if (falhas.length === 0) {
+            mensagemTag.innerText = "Todos os canhotos atrasados foram enviados!";
+            mensagemTag.style.color = "green";
+        } else {
+            mensagemTag.innerText = "Alguns envios continuam pendentes.";
+            mensagemTag.style.color = "red";
+        }
+    }
+        });
+    </script>
+</body>
+</html>
