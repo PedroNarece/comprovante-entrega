@@ -3,9 +3,11 @@ ProofSnap - Delivery Receipt Capture & Validation
 Autor: Pedro Narece Silva Guimarães
 
 Nota de Desenvolvimento:
-A arquitetura, a lógica de negócio e as decisões estruturais deste sistema foram 
-desenhadas e revisadas por mim. Ferramentas de Inteligência Artificial foram 
-utilizadas estritamente como assistentes de digitação para aceleração de sintaxe.
+Projeto prático desenvolvido para otimização logística (Aliança Atacadista), 
+evoluindo em paralelo com a minha graduação em Engenharia da Computação. 
+A visão do produto, arquitetura de dados e validação do fluxo foram estruturadas 
+por mim. O código-fonte foi escrito, refatorado e auditado em colaboração com 
+Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto técnico.
 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -15,144 +17,131 @@ utilizadas estritamente como assistentes de digitação para aceleração de sin
     <title>ProofSnap - Motorista</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #f4f4f9; }
-        /* Adicionamos estilo para os novos campos de texto */
         input[type="text"] { padding: 10px; font-size: 16px; margin-top: 10px; width: 80%; max-width: 300px; border: 1px solid #ccc; border-radius: 5px; }
         button { padding: 15px 30px; font-size: 18px; margin-top: 20px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 8px; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
         input[type="file"] { margin-top: 20px; font-size: 16px; }
         #mensagem { margin-top: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
     <h1>ProofSnap</h1>
-    <p>Preencha os dados e tire a foto do canhoto:</p>
-    
     <form id="formulario-foto">
-        <!-- Novos campos para Carga e Motorista -->
-        <input type="text" id="numero-carga" placeholder="Número da carga (Ex: 45653)" required>
-        <br>
-        <input type="text" id="nome-motorista" placeholder="Nome do Motorista" required>
-        <br>
-        
-        <input type="file" id="foto-canhoto" accept="image/*" capture="environment" required>
-        <br>
-        <button type="submit">Enviar Canhoto</button>
+        <input type="text" id="numero-carga" placeholder="Número da Carga" required><br>
+        <input type="text" id="nome-motorista" placeholder="Nome do Motorista" required><br>
+        <input type="file" id="foto-canhoto" accept="image/*" required><br>
+        <button type="submit" id="botao-enviar">Enviar Canhoto</button>
     </form>
-
     <p id="mensagem"></p>
 
     <script>
-        document.getElementById('formulario-foto').addEventListener('submit', async function(evento) {
-    evento.preventDefault(); 
-    
-    const mensagemTag = document.getElementById('mensagem');
-    const carga = document.getElementById('numero-carga').value;
-    const motorista = document.getElementById('nome-motorista').value;
-    const arquivo = document.getElementById('foto-canhoto').files[0];
-
-    if (!arquivo) return; // Se não houver foto, não faz nada
-
-    // 1. Verifica se há internet no momento do clique
-    if (navigator.onLine) {
-        await enviarParaServidor(carga, motorista, arquivo, mensagemTag);
-    } else {
-        guardarOffline(carga, motorista, arquivo, mensagemTag);
-    }
-});
-
-// Função que faz o envio normal (o que já tínhamos antes)
-async function enviarParaServidor(carga, motorista, arquivo, mensagemTag) {
-    mensagemTag.innerText = "A enviar...";
-    mensagemTag.style.color = "black";
-
-    const pacote = new FormData();
-    pacote.append('foto', arquivo);
-    pacote.append('carga', carga);
-    pacote.append('motorista', motorista);
-
-    try {
-        const resposta = await fetch('/upload/', { method: 'POST', body: pacote });
-
-        if (resposta.ok) {
-            mensagemTag.innerText = "Canhoto enviado com sucesso!";
-            mensagemTag.style.color = "green";
-            document.getElementById('formulario-foto').reset(); 
-        } else {
-            mensagemTag.innerText = "Erro ao enviar canhoto.";
-            mensagemTag.style.color = "red";
-        }
-    } catch (erro) {
-        mensagemTag.innerText = "Erro no servidor. Tentaremos novamente depois.";
-        mensagemTag.style.color = "red";
-        guardarOffline(carga, motorista, arquivo, mensagemTag); // Se a net cair a meio, guarda
-    }
-}
-
-// Função que traduz a foto e a guarda no telemóvel
-function guardarOffline(carga, motorista, arquivo, mensagemTag) {
-    const leitor = new FileReader();
-    
-    leitor.onload = function(eventoLeitura) {
-        const fotoBase64 = eventoLeitura.target.result; // A foto transformada em texto
-        const entrega = { carga: carga, motorista: motorista, foto: fotoBase64 };
-
-        // Vai à memória buscar a fila de entregas ou cria uma fila vazia
-        let entregasPendentes = JSON.parse(localStorage.getItem('filaProofSnap')) || [];
-        entregasPendentes.push(entrega);
-
-        // Grava a fila atualizada de volta na memória do telemóvel
-        localStorage.setItem('filaProofSnap', JSON.stringify(entregasPendentes));
+        let db, sincronizando = false;
+        const requestDB = indexedDB.open("ProofSnapDB", 1);
         
-        mensagemTag.innerText = "Sem sinal! Guardado no telemóvel para envio automático.";
-        mensagemTag.style.color = "orange";
-        document.getElementById('formulario-foto').reset();
-    };
-    
-    leitor.readAsDataURL(arquivo); // Inicia a tradução da foto
-}
+        requestDB.onupgradeneeded = (e) => { db = e.target.result; db.createObjectStore("entregas", { keyPath: "id" }); };
+        requestDB.onsuccess = (e) => { db = e.target.result; sincronizarFila(); };
+        requestDB.onerror = () => console.error("Erro ao abrir base de dados.");
 
-// O "espião" que deteta quando a internet (Wi-Fi ou 4G) volta a ligar
-window.addEventListener('online', async function() {
-    let entregasPendentes = JSON.parse(localStorage.getItem('filaProofSnap')) || [];
+        function gerarUUID() {
+            if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
 
-    if (entregasPendentes.length > 0) {
-        const mensagemTag = document.getElementById('mensagem');
-        mensagemTag.innerText = "Sinal recuperado! A enviar canhotos pendentes...";
-        mensagemTag.style.color = "blue";
+        document.getElementById('formulario-foto').addEventListener('submit', async function(evento) {
+            evento.preventDefault(); 
+            const botao = document.getElementById('botao-enviar'), msg = document.getElementById('mensagem');
+            const arquivo = document.getElementById('foto-canhoto').files[0];
+            if (!arquivo) return;
 
-        let falhas = []; // Lista para guardar os que voltarem a falhar
-
-        for (let entrega of entregasPendentes) {
-            // Transforma o texto (Base64) de volta num ficheiro de imagem real
-            const respostaBase64 = await fetch(entrega.foto);
-            const blob = await respostaBase64.blob();
-            const arquivoRecuperado = new File([blob], "foto_recuperada.jpg", { type: "image/jpeg" });
-
-            // Empacota e tenta enviar
-            const pacote = new FormData();
-            pacote.append('foto', arquivoRecuperado);
-            pacote.append('carga', entrega.carga);
-            pacote.append('motorista', entrega.motorista);
+            botao.disabled = true;
+            msg.innerText = "Processando...";
+            msg.style.color = "black";
+            const id_entrega = gerarUUID();
 
             try {
-                const resposta = await fetch('/upload/', { method: 'POST', body: pacote });
-                if (!resposta.ok) throw new Error("Servidor rejeitou");
-            } catch (erro) {
-                falhas.push(entrega); // Se falhou, volta para a fila de espera
+                if (navigator.onLine) await tentarEnviar(id_entrega, document.getElementById('numero-carga').value, document.getElementById('nome-motorista').value, arquivo, msg);
+                else await guardarOffline(id_entrega, document.getElementById('numero-carga').value, document.getElementById('nome-motorista').value, arquivo, msg);
+            } finally {
+                // Item 1: finally engloba ambas as chamadas e assegura o desbloqueio
+                botao.disabled = false;
             }
-        }
-
-        // Atualiza a memória apenas com os que sobraram (os que falharam)
-        localStorage.setItem('filaProofSnap', JSON.stringify(falhas));
-
-        if (falhas.length === 0) {
-            mensagemTag.innerText = "Todos os canhotos atrasados foram enviados!";
-            mensagemTag.style.color = "green";
-        } else {
-            mensagemTag.innerText = "Alguns envios continuam pendentes.";
-            mensagemTag.style.color = "red";
-        }
-    }
         });
+
+        async function tentarEnviar(id, carga, motorista, arquivo, msgTag) {
+            const p = new FormData();
+            p.append('foto', arquivo); p.append('carga', carga); p.append('motorista', motorista); p.append('id_entrega', id);
+            try {
+                const res = await fetch('/upload/', { method: 'POST', body: p });
+                if (res.ok) {
+                    msgTag.innerText = "Canhoto enviado!";
+                    msgTag.style.color = "green";
+                    document.getElementById('formulario-foto').reset();
+                } else if (res.status >= 400 && res.status < 500) {
+                    // Item 5: parse defensivo do JSON
+                    let txtErro = "Dados inválidos.";
+                    try {
+                        const json = await res.json();
+                        if (typeof json.detail === "string") txtErro = json.detail;
+                    } catch (e) { txtErro = "Erro " + res.status; }
+                    msgTag.innerText = "Rejeitado: " + txtErro;
+                    msgTag.style.color = "red";
+                } else await guardarOffline(id, carga, motorista, arquivo, msgTag);
+            } catch (e) { await guardarOffline(id, carga, motorista, arquivo, msgTag); }
+        }
+
+        function guardarOffline(id, carga, motorista, arquivo, msgTag) {
+            return new Promise((resolve) => {
+                if (!db) return resolve();
+                const req = db.transaction(["entregas"], "readwrite").objectStore("entregas").add({ id, carga, motorista, foto: arquivo });
+                req.onsuccess = () => {
+                    msgTag.innerText = "Guardado para envio automático.";
+                    msgTag.style.color = "orange";
+                    document.getElementById('formulario-foto').reset();
+                    resolve();
+                };
+                req.onerror = () => { msgTag.innerText = "Erro local (memória cheia?)."; msgTag.style.color = "red"; resolve(); }; // Item 2
+            });
+        }
+
+        async function sincronizarFila() {
+            if (sincronizando || !navigator.onLine || !db) return;
+            sincronizando = true;
+            try {
+                const entregas = await new Promise((res, rej) => {
+                    const req = db.transaction(["entregas"]).objectStore("entregas").getAll();
+                    req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error);
+                });
+                if (entregas.length === 0) return;
+
+                let enviados = 0, rejeitados = 0; // Item 3
+                for (let e of entregas) {
+                    const p = new FormData();
+                    p.append('foto', e.foto); p.append('carga', e.carga); p.append('motorista', e.motorista); p.append('id_entrega', e.id); 
+                    try {
+                        const res = await fetch('/upload/', { method: 'POST', body: p });
+                        if (res.ok || (res.status >= 400 && res.status < 500)) {
+                            await new Promise(r => {
+                                const reqDel = db.transaction(["entregas"], "readwrite").objectStore("entregas").delete(e.id);
+                                reqDel.onsuccess = r; reqDel.onerror = r;
+                            });
+                            if (res.ok) enviados++; else rejeitados++;
+                        }
+                    } catch (err) {}
+                }
+                
+                // Item 4: Só notifica se tiver ocorrido atividade no lote
+                if (enviados > 0 || rejeitados > 0) {
+                    const msg = document.getElementById('mensagem');
+                    msg.innerText = `Sincronização: ${enviados} enviados, ${rejeitados} rejeitados.`;
+                    msg.style.color = rejeitados > 0 ? "orange" : "green";
+                }
+            } finally { sincronizando = false; }
+        }
+        window.addEventListener('online', sincronizarFila);
+        setInterval(sincronizarFila, 30000);
     </script>
 </body>
 </html>
