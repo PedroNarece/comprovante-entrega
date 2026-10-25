@@ -5,5 +5,11 @@ uploads/
 .venv/
 __pycache__/
 
+# Ignora credenciais e configurações locais (NUNCA comitar)
+.env
+
+# Ignora banco de dados local SQLite
+*.db
+
 # Ignora ficheiros de sistema do macOS
 .DS_Store

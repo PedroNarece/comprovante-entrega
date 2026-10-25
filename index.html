@@ -29,7 +29,7 @@ Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto té
     <form id="formulario-foto">
         <input type="text" id="numero-carga" placeholder="Número da Carga" required><br>
         <input type="text" id="nome-motorista" placeholder="Nome do Motorista" required><br>
-        <input type="file" id="foto-canhoto" accept="image/*" required><br>
+        <input type="file" id="foto-canhoto" accept="image/jpeg,image/png,image/webp" capture="environment" required><br>
         <button type="submit" id="botao-enviar">Enviar Canhoto</button>
     </form>
     <p id="mensagem"></p>
@@ -54,7 +54,38 @@ Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto té
             evento.preventDefault(); 
             const botao = document.getElementById('botao-enviar'), msg = document.getElementById('mensagem');
             const arquivo = document.getElementById('foto-canhoto').files[0];
+            const campoCarga = document.getElementById('numero-carga');
+            const campoMotorista = document.getElementById('nome-motorista');
+            
             if (!arquivo) return;
+
+            const cargaValor = campoCarga.value.trim();
+            const motoristaValor = campoMotorista.value.trim();
+
+            // === PADRÃO FAIL FAST (Validação antes de gastar recursos ou salvar no IndexedDB) ===
+            // 1. Validação da Carga (somente números)
+            if (!/^\d+$/.test(cargaValor)) {
+                msg.innerText = "Erro: O número da carga deve conter apenas dígitos.";
+                msg.style.color = "red";
+                return;
+            }
+
+            // 2. Validação do Tipo MIME da foto
+            const formatosValidos = ["image/jpeg", "image/png", "image/webp"];
+            if (!formatosValidos.includes(arquivo.type)) {
+                msg.innerText = "Formato não suportado. Apenas fotos JPEG, PNG ou WEBP.";
+                msg.style.color = "red";
+                return;
+            }
+
+            // 3. Validação do Tamanho Máximo (10 Megabytes)
+            const LIMITE_TAMANHO = 10 * 1024 * 1024;
+            if (arquivo.size > LIMITE_TAMANHO) {
+                const tamanhoMB = (arquivo.size / (1024 * 1024)).toFixed(1);
+                msg.innerText = `Foto muito pesada (${tamanhoMB} MB). O limite é 10 MB.`;
+                msg.style.color = "red";
+                return;
+            }
 
             botao.disabled = true;
             msg.innerText = "Processando...";
@@ -62,8 +93,8 @@ Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto té
             const id_entrega = gerarUUID();
 
             try {
-                if (navigator.onLine) await tentarEnviar(id_entrega, document.getElementById('numero-carga').value, document.getElementById('nome-motorista').value, arquivo, msg);
-                else await guardarOffline(id_entrega, document.getElementById('numero-carga').value, document.getElementById('nome-motorista').value, arquivo, msg);
+                if (navigator.onLine) await tentarEnviar(id_entrega, cargaValor, motoristaValor, arquivo, msg);
+                else await guardarOffline(id_entrega, cargaValor, motoristaValor, arquivo, msg);
             } finally {
                 // Item 1: finally engloba ambas as chamadas e assegura o desbloqueio
                 botao.disabled = false;
