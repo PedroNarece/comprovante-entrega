@@ -49,7 +49,7 @@ Key design decisions and trade-offs will be documented here as they are made.
 - [x] **v1 — End-to-end skeleton**: take photo → upload to cloud storage → simple web page listing photos by date. No offline support, no AI.
 - [x] **v2 — Reliability**: offline queue with sync and retry, authentication, organization by route/driver/date.
 - [x] **v3 — Intelligence**: server-side AI content validation, rejection metrics, dashboard with daily stats.
-- [ ] **v4 — Operations**: structured logging, metrics (time from delivery to availability, upload failure rate), load simulation with concurrent drivers.
+- [x] **v4 — Operations**: structured logging, metrics (time from delivery to availability, upload failure rate), load simulation with concurrent drivers.
 
 ## Privacy by Design
 

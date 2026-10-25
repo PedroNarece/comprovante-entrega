@@ -14,19 +14,46 @@ import re
 import html
 import secrets
 import uuid
+import time
+import logging
 from PIL import Image
 from dotenv import load_dotenv
 import database
 import ai_validator
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, status
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, status, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+
+# Configuração de Logging Estruturado (v4 - Operations)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] [%(name)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger("proofsnap.ops")
 
 # Carrega as variáveis definidas no arquivo .env para o os.environ do sistema
 load_dotenv()
 
 app = FastAPI()
 security = HTTPBasic()
+
+# Middleware de Observabilidade e Métricas de Performance (v4)
+@app.middleware("http")
+async def registrar_metricas_requisicao(request: Request, call_next):
+    inicio = time.perf_counter()
+    resposta = await call_next(request)
+    duracao_ms = (time.perf_counter() - inicio) * 1000
+    
+    # Injeta cabeçalho com o tempo de resposta para diagnóstico do cliente
+    resposta.headers["X-Response-Time-Ms"] = f"{duracao_ms:.2f}"
+    
+    ip_cliente = request.client.host if request.client else "desconhecido"
+    logger.info(
+        f"MÉTRICA | {request.method} {request.url.path} | Status: {resposta.status_code} | "
+        f"Latência: {duracao_ms:.2f}ms | IP: {ip_cliente}"
+    )
+    return resposta
 
 os.makedirs("uploads", exist_ok=True)
 # Cria o arquivo SQLite e a tabela 'entregas' automaticamente se não existirem
@@ -97,6 +124,8 @@ async def receber_foto(
     caminho_final = os.path.join("uploads", novo_nome)
     caminho_temp = f"{caminho_final}.temp"
     
+    logger.info(f"UPLOAD INICIADO | Carga: {carga} | Motorista: {nome_limpo_motorista} | ID: {valido_id}")
+    
     # Limite de tamanho lendo em chunks para não estourar a memória RAM (Max 10MB)
     MAX_SIZE = 10 * 1024 * 1024
     tamanho_atual = 0
@@ -138,7 +167,10 @@ async def receber_foto(
             motivo_ia=resultado_ia["motivo"],
             tem_assinatura=resultado_ia["tem_assinatura"]
         )
+        
+        logger.info(f"AUDITORIA CONCLUÍDA | Carga: {carga} | Status: {status_final} | Motivo: {resultado_ia['motivo']}")
     except Exception as erro:
+        logger.error(f"FALHA NO UPLOAD | Carga: {carga} | Erro: {erro}")
         # Garante que nenhum arquivo temporário incompleto permaneça no disco
         if os.path.exists(caminho_temp):
             os.remove(caminho_temp)
