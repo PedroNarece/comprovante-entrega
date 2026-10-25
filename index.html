@@ -107,8 +107,28 @@ Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto té
             try {
                 const res = await fetch('/upload/', { method: 'POST', body: p });
                 if (res.ok) {
-                    msgTag.innerText = "Canhoto enviado!";
-                    msgTag.style.color = "green";
+                    const dados = await res.json();
+                    
+                    if (dados.status === "APROVADO") {
+                        msgTag.innerHTML = `
+                            <div style="background: #dcfce7; border: 1px solid #86efac; color: #166534; padding: 12px; border-radius: 8px; margin-top: 15px;">
+                                <strong style="font-size: 16px;">Canhoto Aprovado pela IA! ✅</strong><br>
+                                <span style="font-size: 13px; color: #15803d;">${dados.motivo_ia || "Documento válido e assinado."}</span>
+                            </div>
+                        `;
+                    } else if (dados.status === "REJEITADO") {
+                        msgTag.innerHTML = `
+                            <div style="background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; padding: 12px; border-radius: 8px; margin-top: 15px;">
+                                <strong style="font-size: 16px;">Atenção: Canhoto Rejeitado! ⚠️</strong><br>
+                                <span style="font-size: 13px; color: #b91c1c;">${dados.motivo_ia || "Foto sem assinatura ou ilegível."}</span><br>
+                                <small style="display:block; margin-top: 5px; color: #475569;">Por favor, tire outra foto focada com a assinatura visível.</small>
+                            </div>
+                        `;
+                    } else {
+                        msgTag.innerText = "Canhoto enviado com sucesso!";
+                        msgTag.style.color = "green";
+                    }
+                    
                     document.getElementById('formulario-foto').reset();
                 } else if (res.status >= 400 && res.status < 500) {
                     // Item 5: parse defensivo do JSON
