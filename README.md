@@ -2,6 +2,14 @@
 
 > 📦 Capture, validate and instantly share proof-of-delivery documents.
 
+[![Live Demo](https://img.shields.io/badge/Demo-Online-brightgreen?style=for-the-badge&logo=render)](https://proofsnap-x8tx.onrender.com)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
+[![Google Gemini](https://img.shields.io/badge/AI-Google%20Gemini-4285F4?style=for-the-badge&logo=google)](https://aistudio.google.com)
+[![SQLite](https://img.shields.io/badge/Database-SQLite-003B57?style=for-the-badge&logo=sqlite)](https://sqlite.org)
+
+🌐 **Aplicação no Ar (Mobile):** [https://proofsnap-x8tx.onrender.com](https://proofsnap-x8tx.onrender.com)  
+📊 **Dashboard de Auditoria:** [https://proofsnap-x8tx.onrender.com/dashboard](https://proofsnap-x8tx.onrender.com/dashboard)
+
 ## The Problem
 
 In wholesale distribution, drivers collect signed paper receipts ("canhotos") as proof of delivery. Where I work, the physical receipt only becomes available to office staff **after it returns to headquarters and is scanned — which can take weeks**. Until then, anyone who needs proof of a delivery (billing, customer disputes) simply has to wait, or ask the driver to send a photo over a messaging app.
