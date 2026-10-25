@@ -29,7 +29,7 @@ def _validar_com_gemini(caminho_foto: str, api_key: str) -> dict:
         cliente = genai.Client(api_key=api_key)
         with Image.open(caminho_foto) as imagem:
             resposta = cliente.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-flash-latest",
                 contents=[imagem, PROMPT_ANALISE_CANHOTO]
             )
             
