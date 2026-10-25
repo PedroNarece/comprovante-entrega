@@ -1,38 +1,267 @@
 <!--
 ProofSnap - Delivery Receipt Capture & Validation
 Autor: Pedro Narece Silva Guimarães
-
-Nota de Desenvolvimento:
-Projeto prático desenvolvido para otimização logística de entregas,
-evoluindo em paralelo com a minha graduação em Engenharia da Computação.
-A visão do produto, arquitetura de dados e validação do fluxo foram estruturadas 
-por mim. O código-fonte foi escrito, refatorado e auditado em colaboração com 
-Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto técnico.
 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ProofSnap - Motorista</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #f4f4f9; }
-        input[type="text"] { padding: 10px; font-size: 16px; margin-top: 10px; width: 80%; max-width: 300px; border: 1px solid #ccc; border-radius: 5px; }
-        button { padding: 15px 30px; font-size: 18px; margin-top: 20px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 8px; }
-        button:disabled { background-color: #cccccc; cursor: not-allowed; }
-        input[type="file"] { margin-top: 20px; font-size: 16px; }
-        #mensagem { margin-top: 20px; font-weight: bold; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f1f5f9;
+            margin: 0;
+            padding: 0;
+            color: #0f172a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Barra de Topo com Status da Rede */
+        header {
+            width: 100%;
+            background: white;
+            padding: 14px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .logo-area { display: flex; align-items: center; gap: 8px; }
+        .logo-title { font-size: 18px; font-weight: 800; color: #0284c7; margin: 0; }
+        .rede-badge {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+        }
+        .rede-online { background-color: #dcfce7; color: #15803d; }
+        .rede-offline { background-color: #fef3c7; color: #b45309; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .dot-online { background-color: #16a34a; }
+        .dot-offline { background-color: #d97706; }
+
+        /* Container Principal */
+        main {
+            width: 100%;
+            max-width: 420px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Cartão do Formulário */
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .campo-grupo {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+        label { font-size: 13px; font-weight: 600; color: #475569; }
+        input[type="text"] {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.2s;
+            background: #f8fafc;
+        }
+        input[type="text"]:focus {
+            border-color: #0284c7;
+            background: white;
+        }
+
+        /* Botão Customizado de Captura de Foto */
+        .foto-container {
+            margin: 16px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .foto-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+        .btn-camera {
+            width: 100%;
+            background-color: #f8fafc;
+            border: 2px dashed #94a3b8;
+            color: #334155;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-camera:active { background-color: #e2e8f0; }
+        input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        /* Pré-visualização da Imagem */
+        #preview-container {
+            display: none;
+            position: relative;
+            width: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            background: #000;
+        }
+        #preview-img {
+            width: 100%;
+            max-height: 250px;
+            object-fit: contain;
+            display: block;
+        }
+        .btn-remover-foto {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.65);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* Botão de Envio */
+        .btn-enviar {
+            width: 100%;
+            background: #0284c7;
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-enviar:active { transform: scale(0.98); }
+        .btn-enviar:disabled {
+            background: #94a3b8;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Mensagens de Feedback */
+        #mensagem {
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        /* Rodapé Informativo */
+        footer {
+            margin-top: auto;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+        }
     </style>
 </head>
 <body>
-    <h1>ProofSnap</h1>
-    <form id="formulario-foto">
-        <input type="text" id="numero-carga" placeholder="Número da Carga" required><br>
-        <input type="text" id="nome-motorista" placeholder="Nome do Motorista" required><br>
-        <input type="file" id="foto-canhoto" accept="image/jpeg,image/png,image/webp" capture="environment" required><br>
-        <button type="submit" id="botao-enviar">Enviar Canhoto</button>
-    </form>
-    <p id="mensagem"></p>
+    <header>
+        <div class="logo-area">
+            <span style="font-size: 20px;">📦</span>
+            <h1 class="logo-title">ProofSnap</h1>
+        </div>
+        <div id="badge-rede" class="rede-badge rede-online">
+            <span id="dot-rede" class="dot dot-online"></span>
+            <span id="texto-rede">Online</span>
+        </div>
+    </header>
+
+    <main>
+        <div class="card">
+            <form id="formulario-foto">
+                <div class="campo-grupo">
+                    <label for="numero-carga">Número da Carga</label>
+                    <input type="text" id="numero-carga" inputmode="numeric" placeholder="Ex: 4434" required>
+                </div>
+
+                <div class="campo-grupo">
+                    <label for="nome-motorista">Nome do Motorista</label>
+                    <input type="text" id="nome-motorista" placeholder="Ex: Pedro Silva" required>
+                </div>
+
+                <div class="foto-container">
+                    <label>Comprovante de Entrega (Canhoto)</label>
+                    
+                    <div class="foto-btn-wrapper" id="camera-picker">
+                        <div class="btn-camera">
+                            <span style="font-size: 28px;">📷</span>
+                            <span>Tirar Foto do Canhoto</span>
+                            <small style="color: #64748b; font-weight: normal;">Câmera traseira nativa</small>
+                        </div>
+                        <input type="file" id="foto-canhoto" accept="image/jpeg,image/png,image/webp" capture="environment" required>
+                    </div>
+
+                    <div id="preview-container">
+                        <img id="preview-img" src="" alt="Pré-visualização">
+                        <button type="button" class="btn-remover-foto" id="btn-remover">✕ Trocar Foto</button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-enviar" id="botao-enviar">
+                    <span>Enviar Canhoto</span>
+                </button>
+            </form>
+
+            <div id="mensagem"></div>
+        </div>
+    </main>
+
+    <footer>
+        ProofSnap v3 • Auditoria Inteligente com Google Gemini
+    </footer>
 
     <script>
         let db, sincronizando = false;
@@ -41,6 +270,54 @@ Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto té
         requestDB.onupgradeneeded = (e) => { db = e.target.result; db.createObjectStore("entregas", { keyPath: "id" }); };
         requestDB.onsuccess = (e) => { db = e.target.result; sincronizarFila(); };
         requestDB.onerror = () => console.error("Erro ao abrir base de dados.");
+
+        // Atualização visual do status de conexão
+        function atualizarStatusRede() {
+            const badge = document.getElementById('badge-rede');
+            const dot = document.getElementById('dot-rede');
+            const texto = document.getElementById('texto-rede');
+            
+            if (navigator.onLine) {
+                badge.className = "rede-badge rede-online";
+                dot.className = "dot dot-online";
+                texto.innerText = "Online";
+                sincronizarFila();
+            } else {
+                badge.className = "rede-badge rede-offline";
+                dot.className = "dot dot-offline";
+                texto.innerText = "Modo Offline";
+            }
+        }
+        window.addEventListener('online', atualizarStatusRede);
+        window.addEventListener('offline', atualizarStatusRede);
+        atualizarStatusRede();
+
+        // Preview da Foto Selecionada
+        const inputFoto = document.getElementById('foto-canhoto');
+        const cameraPicker = document.getElementById('camera-picker');
+        const previewContainer = document.getElementById('preview-container');
+        const previewImg = document.getElementById('preview-img');
+        const btnRemover = document.getElementById('btn-remover');
+
+        inputFoto.addEventListener('change', function() {
+            const arquivo = this.files[0];
+            if (arquivo) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    cameraPicker.style.display = "none";
+                    previewContainer.style.display = "block";
+                };
+                reader.readAsDataURL(arquivo);
+            }
+        });
+
+        btnRemover.addEventListener('click', function() {
+            inputFoto.value = "";
+            previewImg.src = "";
+            previewContainer.style.display = "none";
+            cameraPicker.style.display = "block";
+        });
 
         function gerarUUID() {
             if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -53,7 +330,7 @@ Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto té
         document.getElementById('formulario-foto').addEventListener('submit', async function(evento) {
             evento.preventDefault(); 
             const botao = document.getElementById('botao-enviar'), msg = document.getElementById('mensagem');
-            const arquivo = document.getElementById('foto-canhoto').files[0];
+            const arquivo = inputFoto.files[0];
             const campoCarga = document.getElementById('numero-carga');
             const campoMotorista = document.getElementById('nome-motorista');
             
@@ -62,42 +339,36 @@ Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto té
             const cargaValor = campoCarga.value.trim();
             const motoristaValor = campoMotorista.value.trim();
 
-            // === PADRÃO FAIL FAST (Validação antes de gastar recursos ou salvar no IndexedDB) ===
-            // 1. Validação da Carga (somente números)
+            // === PADRÃO FAIL FAST ===
             if (!/^\d+$/.test(cargaValor)) {
-                msg.innerText = "Erro: O número da carga deve conter apenas dígitos.";
-                msg.style.color = "red";
+                msg.innerHTML = `<div style="color: #b91c1c; font-size: 14px; font-weight: 600; padding: 10px; background: #fee2e2; border-radius: 8px;">A carga deve conter apenas números.</div>`;
                 return;
             }
 
-            // 2. Validação do Tipo MIME da foto
             const formatosValidos = ["image/jpeg", "image/png", "image/webp"];
             if (!formatosValidos.includes(arquivo.type)) {
-                msg.innerText = "Formato não suportado. Apenas fotos JPEG, PNG ou WEBP.";
-                msg.style.color = "red";
+                msg.innerHTML = `<div style="color: #b91c1c; font-size: 14px; font-weight: 600; padding: 10px; background: #fee2e2; border-radius: 8px;">Formato inválido. Apenas fotos JPEG, PNG ou WEBP.</div>`;
                 return;
             }
 
-            // 3. Validação do Tamanho Máximo (10 Megabytes)
             const LIMITE_TAMANHO = 10 * 1024 * 1024;
             if (arquivo.size > LIMITE_TAMANHO) {
                 const tamanhoMB = (arquivo.size / (1024 * 1024)).toFixed(1);
-                msg.innerText = `Foto muito pesada (${tamanhoMB} MB). O limite é 10 MB.`;
-                msg.style.color = "red";
+                msg.innerHTML = `<div style="color: #b91c1c; font-size: 14px; font-weight: 600; padding: 10px; background: #fee2e2; border-radius: 8px;">Foto muito pesada (${tamanhoMB} MB). Limite de 10 MB.</div>`;
                 return;
             }
 
             botao.disabled = true;
-            msg.innerText = "Processando...";
-            msg.style.color = "black";
+            botao.innerHTML = `<span>Auditando com IA... ⏳</span>`;
+            msg.innerHTML = "";
             const id_entrega = gerarUUID();
 
             try {
                 if (navigator.onLine) await tentarEnviar(id_entrega, cargaValor, motoristaValor, arquivo, msg);
                 else await guardarOffline(id_entrega, cargaValor, motoristaValor, arquivo, msg);
             } finally {
-                // Item 1: finally engloba ambas as chamadas e assegura o desbloqueio
                 botao.disabled = false;
+                botao.innerHTML = `<span>Enviar Canhoto</span>`;
             }
         });
 
@@ -111,34 +382,32 @@ Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto té
                     
                     if (dados.status === "APROVADO") {
                         msgTag.innerHTML = `
-                            <div style="background: #dcfce7; border: 1px solid #86efac; color: #166534; padding: 12px; border-radius: 8px; margin-top: 15px;">
+                            <div style="background: #dcfce7; border: 1.5px solid #86efac; color: #166534; padding: 14px; border-radius: 12px; margin-top: 15px;">
                                 <strong style="font-size: 16px;">Canhoto Aprovado pela IA! ✅</strong><br>
-                                <span style="font-size: 13px; color: #15803d;">${dados.motivo_ia || "Documento válido e assinado."}</span>
+                                <span style="font-size: 13px; color: #15803d; display: block; margin-top: 4px;">${dados.motivo_ia || "Documento válido e assinado."}</span>
                             </div>
                         `;
                     } else if (dados.status === "REJEITADO") {
                         msgTag.innerHTML = `
-                            <div style="background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; padding: 12px; border-radius: 8px; margin-top: 15px;">
+                            <div style="background: #fee2e2; border: 1.5px solid #fca5a5; color: #991b1b; padding: 14px; border-radius: 12px; margin-top: 15px;">
                                 <strong style="font-size: 16px;">Atenção: Canhoto Rejeitado! ⚠️</strong><br>
-                                <span style="font-size: 13px; color: #b91c1c;">${dados.motivo_ia || "Foto sem assinatura ou ilegível."}</span><br>
-                                <small style="display:block; margin-top: 5px; color: #475569;">Por favor, tire outra foto focada com a assinatura visível.</small>
+                                <span style="font-size: 13px; color: #b91c1c; display: block; margin-top: 4px;">${dados.motivo_ia || "Foto sem assinatura ou ilegível."}</span>
+                                <small style="display:block; margin-top: 8px; color: #475569; font-weight: 600;">Por favor, tire outra foto focada com a assinatura visível.</small>
                             </div>
                         `;
                     } else {
-                        msgTag.innerText = "Canhoto enviado com sucesso!";
-                        msgTag.style.color = "green";
+                        msgTag.innerHTML = `<div style="background: #dcfce7; color: #15803d; padding: 12px; border-radius: 8px;">Canhoto enviado com sucesso!</div>`;
                     }
                     
                     document.getElementById('formulario-foto').reset();
+                    btnRemover.click(); // Reseta o preview
                 } else if (res.status >= 400 && res.status < 500) {
-                    // Item 5: parse defensivo do JSON
                     let txtErro = "Dados inválidos.";
                     try {
                         const json = await res.json();
                         if (typeof json.detail === "string") txtErro = json.detail;
                     } catch (e) { txtErro = "Erro " + res.status; }
-                    msgTag.innerText = "Rejeitado: " + txtErro;
-                    msgTag.style.color = "red";
+                    msgTag.innerHTML = `<div style="background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 8px;">Rejeitado pelo servidor: ${txtErro}</div>`;
                 } else await guardarOffline(id, carga, motorista, arquivo, msgTag);
             } catch (e) { await guardarOffline(id, carga, motorista, arquivo, msgTag); }
         }
@@ -148,12 +417,20 @@ Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto té
                 if (!db) return resolve();
                 const req = db.transaction(["entregas"], "readwrite").objectStore("entregas").add({ id, carga, motorista, foto: arquivo });
                 req.onsuccess = () => {
-                    msgTag.innerText = "Guardado para envio automático.";
-                    msgTag.style.color = "orange";
+                    msgTag.innerHTML = `
+                        <div style="background: #fef3c7; border: 1.5px solid #fde68a; color: #92400e; padding: 14px; border-radius: 12px; margin-top: 15px;">
+                            <strong style="font-size: 15px;">Salvo Offline no Celular! 📦</strong><br>
+                            <span style="font-size: 13px;">Sem sinal de internet. O canhoto será enviado automaticamente assim que a conexão voltar.</span>
+                        </div>
+                    `;
                     document.getElementById('formulario-foto').reset();
+                    btnRemover.click();
                     resolve();
                 };
-                req.onerror = () => { msgTag.innerText = "Erro local (memória cheia?)."; msgTag.style.color = "red"; resolve(); }; // Item 2
+                req.onerror = () => {
+                    msgTag.innerHTML = `<div style="background: #fee2e2; color: #b91c1c; padding: 12px; border-radius: 8px;">Erro ao guardar offline (memória cheia?).</div>`;
+                    resolve();
+                };
             });
         }
 
@@ -167,7 +444,7 @@ Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto té
                 });
                 if (entregas.length === 0) return;
 
-                let enviados = 0, rejeitados = 0; // Item 3
+                let enviados = 0, rejeitados = 0;
                 for (let e of entregas) {
                     const p = new FormData();
                     p.append('foto', e.foto); p.append('carga', e.carga); p.append('motorista', e.motorista); p.append('id_entrega', e.id); 
@@ -183,15 +460,16 @@ Inteligência Artificial, atuando como ferramenta de aprendizado e co-piloto té
                     } catch (err) {}
                 }
                 
-                // Item 4: Só notifica se tiver ocorrido atividade no lote
                 if (enviados > 0 || rejeitados > 0) {
                     const msg = document.getElementById('mensagem');
-                    msg.innerText = `Sincronização: ${enviados} enviados, ${rejeitados} rejeitados.`;
-                    msg.style.color = rejeitados > 0 ? "orange" : "green";
+                    msg.innerHTML = `
+                        <div style="background: #e0f2fe; border: 1.5px solid #bae6fd; color: #0369a1; padding: 12px; border-radius: 8px; margin-top: 10px;">
+                            Sincronização em lote concluída: <strong>${enviados} enviados</strong>, ${rejeitados} rejeitados.
+                        </div>
+                    `;
                 }
             } finally { sincronizando = false; }
         }
-        window.addEventListener('online', sincronizarFila);
         setInterval(sincronizarFila, 30000);
     </script>
 </body>
