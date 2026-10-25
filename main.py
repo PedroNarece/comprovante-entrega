@@ -17,6 +17,7 @@ import uuid
 from PIL import Image
 from dotenv import load_dotenv
 import database
+import ai_validator
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends, status
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -123,12 +124,19 @@ async def receber_foto(
         # Renomeação atômica pelo SO: o arquivo final só passa a existir quando está 100% completo e validado
         os.replace(caminho_temp, caminho_final)
         
-        # Persiste o registro de entrega no SQLite
+        # Auditoria por Inteligência Artificial (Visão Computacional - Requisito v3)
+        resultado_ia = ai_validator.validar_canhoto_com_ia(caminho_final)
+        status_final = "APROVADO" if (resultado_ia["e_canhoto"] and resultado_ia["tem_assinatura"] and resultado_ia["legivel"]) else "REJEITADO"
+
+        # Persiste o registro de entrega no SQLite com os dados da auditoria da IA
         database.registrar_entrega(
             id_entrega=valido_id,
             carga=carga,
             motorista=nome_limpo_motorista,
-            nome_arquivo=novo_nome
+            nome_arquivo=novo_nome,
+            status=status_final,
+            motivo_ia=resultado_ia["motivo"],
+            tem_assinatura=resultado_ia["tem_assinatura"]
         )
     except Exception as erro:
         # Garante que nenhum arquivo temporário incompleto permaneça no disco
@@ -136,40 +144,91 @@ async def receber_foto(
             os.remove(caminho_temp)
         raise erro
             
-    return {"mensagem": f"Foto guardada como '{novo_nome}'!"}
+    return {
+        "mensagem": f"Foto guardada como '{novo_nome}'!",
+        "status": status_final,
+        "motivo_ia": resultado_ia["motivo"]
+    }
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def ver_dashboard(usuario: str = Depends(verificar_credenciais)):
     entregas = database.listar_entregas()
+    stats = database.obter_estatisticas()
     
-    html_content = """
+    html_content = f"""
     <!DOCTYPE html>
     <html lang="pt-BR">
     <head>
         <meta charset="UTF-8">
-        <title>Dashboard ProofSnap</title>
+        <title>Dashboard ProofSnap - IA & Operações</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 30px; background-color: #f8f9fa; }
-            h1 { color: #333; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-            th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
-            th { background-color: #007bff; color: white; }
-            tr:hover { background-color: #f1f5f9; }
-            a { color: #007bff; text-decoration: none; font-weight: bold; }
-            a:hover { text-decoration: underline; }
-            .badge { background: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 14px; }
+            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 30px; background-color: #f8fafc; color: #1e293b; }}
+            h1 {{ margin-bottom: 5px; }}
+            .subtitulo {{ color: #64748b; margin-top: 0; margin-bottom: 25px; }}
+            
+            /* Cartões de Estatísticas Diárias (v3 Metrics) */
+            .cards-container {{ display: flex; gap: 15px; margin-bottom: 30px; flex-wrap: wrap; }}
+            .card {{ background: white; padding: 20px; border-radius: 10px; flex: 1; min-width: 140px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }}
+            .card-title {{ font-size: 13px; font-weight: 600; text-transform: uppercase; color: #64748b; margin-bottom: 8px; }}
+            .card-valor {{ font-size: 28px; font-weight: 700; }}
+            .card-verde {{ color: #16a34a; }}
+            .card-vermelho {{ color: #dc2626; }}
+            .card-azul {{ color: #2563eb; }}
+            
+            /* Tabela de Canhotos */
+            table {{ width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }}
+            th, td {{ padding: 14px 18px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 14px; }}
+            th {{ background-color: #f1f5f9; font-weight: 600; color: #475569; }}
+            tr:hover {{ background-color: #f8fafc; }}
+            
+            /* Badges de Status */
+            .badge {{ display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }}
+            .badge-aprovado {{ background-color: #dcfce7; color: #15803d; }}
+            .badge-rejeitado {{ background-color: #fee2e2; color: #b91c1c; }}
+            .badge-carga {{ background-color: #e0f2fe; color: #0369a1; }}
+            
+            a.btn-ver {{ color: #2563eb; text-decoration: none; font-weight: 600; }}
+            a.btn-ver:hover {{ text-decoration: underline; }}
+            .motivo-ia {{ font-size: 13px; color: #475569; }}
         </style>
     </head>
     <body>
-        <h1>Dashboard ProofSnap - Canhotos Recebidos</h1>
-        <p>Total de registros no banco: <strong>""" + str(len(entregas)) + """</strong></p>
+        <h1>Dashboard ProofSnap</h1>
+        <p class="subtitulo">Auditoria Inteligente de Entregas em Tempo Real (v3)</p>
+        
+        <!-- Cartões de Métricas Operacionais (v3) -->
+        <div class="cards-container">
+            <div class="card">
+                <div class="card-title">Total de Envios</div>
+                <div class="card-valor card-azul">{stats["total"]}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Aprovados pela IA</div>
+                <div class="card-valor card-verde">{stats["aprovados"]}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Rejeitados pela IA</div>
+                <div class="card-valor card-vermelho">{stats["rejeitados"]}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Taxa de Aprovação</div>
+                <div class="card-valor card-verde">{stats["taxa_aprovacao"]}%</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Recebidos Hoje</div>
+                <div class="card-valor">{stats["hoje"]}</div>
+            </div>
+        </div>
+        
+        <!-- Tabela Estruturada -->
         <table>
             <thead>
                 <tr>
+                    <th>Status IA</th>
                     <th>Carga</th>
                     <th>Motorista</th>
-                    <th>Data/Hora</th>
-                    <th>ID da Entrega</th>
+                    <th>Diagnóstico da IA</th>
+                    <th>Data / Hora</th>
                     <th>Comprovante</th>
                 </tr>
             </thead>
@@ -177,22 +236,26 @@ def ver_dashboard(usuario: str = Depends(verificar_credenciais)):
     """
     
     if not entregas:
-        html_content += "<tr><td colspan='5' style='text-align:center;'>Nenhum canhoto registrado ainda.</td></tr>"
+        html_content += "<tr><td colspan='6' style='text-align:center; padding: 30px; color: #94a3b8;'>Nenhum canhoto registrado ainda.</td></tr>"
     else:
         for entrega in entregas:
             nome_seguro = html.escape(entrega["nome_arquivo"])
             carga_segura = html.escape(str(entrega["carga"]))
             motorista_seguro = html.escape(str(entrega["motorista"]))
             data_segura = html.escape(str(entrega["criado_em"]))
-            id_seguro = html.escape(str(entrega["id"]))
+            status_val = str(entrega["status"] if "status" in entrega.keys() else "APROVADO")
+            motivo_val = html.escape(str(entrega["motivo_ia"] if "motivo_ia" in entrega.keys() else "Comprovante validado"))
+            
+            badge_classe = "badge-aprovado" if status_val == "APROVADO" else "badge-rejeitado"
             
             html_content += f"""
                 <tr>
-                    <td><span class='badge'>{carga_segura}</span></td>
-                    <td>{motorista_seguro}</td>
+                    <td><span class='badge {badge_classe}'>{status_val}</span></td>
+                    <td><span class='badge badge-carga'>{carga_segura}</span></td>
+                    <td><strong>{motorista_seguro}</strong></td>
+                    <td class='motivo-ia'>{motivo_val}</td>
                     <td>{data_segura}</td>
-                    <td><code>{id_seguro}</code></td>
-                    <td><a href='/fotos/{nome_seguro}' target='_blank'>Visualizar Canhoto</a></td>
+                    <td><a href='/fotos/{nome_seguro}' target='_blank' class='btn-ver'>Ver Foto</a></td>
                 </tr>
             """
             
